@@ -2,6 +2,7 @@ package com.ruoyi.common.utils.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,29 +17,27 @@ public class Md5Utils
 
     private static byte[] md5(String s)
     {
-        MessageDigest algorithm;
         try
         {
-            algorithm = MessageDigest.getInstance("MD5");
-            algorithm.reset();
-            algorithm.update(s.getBytes("UTF-8"));
-            byte[] messageDigest = algorithm.digest();
-            return messageDigest;
+            MessageDigest algorithm = MessageDigest.getInstance("MD5");
+            algorithm.update(s.getBytes(StandardCharsets.UTF_8));
+            return algorithm.digest();
         }
-        catch (Exception e)
+        catch (NoSuchAlgorithmException e)
         {
-            log.error("MD5 Error...", e);
+            // 摘要计算失败必须中断，绝不能降级返回原始输入，否则密码将以明文形式落库
+            log.error("MD5 algorithm is not available", e);
+            throw new IllegalStateException("MD5 algorithm is not available", e);
         }
-        return null;
     }
 
-    private static final String toHex(byte hash[])
+    private static String toHex(byte hash[])
     {
         if (hash == null)
         {
             return null;
         }
-        StringBuffer buf = new StringBuffer(hash.length * 2);
+        StringBuilder buf = new StringBuilder(hash.length * 2);
         int i;
 
         for (i = 0; i < hash.length; i++)
@@ -47,21 +46,19 @@ public class Md5Utils
             {
                 buf.append("0");
             }
-            buf.append(Long.toString(hash[i] & 0xff, 16));
+            buf.append(Integer.toHexString(hash[i] & 0xff));
         }
         return buf.toString();
     }
 
+    /**
+     * 计算字符串的 MD5 摘要
+     *
+     * @param s 原文
+     * @return 32 位小写十六进制摘要，算法不可用时抛出 {@link IllegalStateException}
+     */
     public static String hash(String s)
     {
-        try
-        {
-            return new String(toHex(md5(s)).getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
-        }
-        catch (Exception e)
-        {
-            log.error("not supported charset...{}", e);
-            return s;
-        }
+        return toHex(md5(s));
     }
 }

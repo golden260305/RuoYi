@@ -23,7 +23,7 @@ import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.bean.BeanValidators;
 import com.ruoyi.common.utils.html.EscapeUtil;
-import com.ruoyi.common.utils.security.Md5Utils;
+import com.ruoyi.common.utils.security.PasswordUtils;
 import com.ruoyi.common.utils.spring.SpringUtils;
 import com.ruoyi.system.domain.SysPost;
 import com.ruoyi.system.domain.SysUserPost;
@@ -531,7 +531,9 @@ public class SysUserServiceImpl implements ISysUserService
                     BeanValidators.validateWithException(validator, user);
                     deptService.checkDeptDataScope(user.getDeptId());
                     String password = configService.selectConfigByKey("sys.user.initPassword");
-                    user.setPassword(Md5Utils.hash(user.getLoginName() + password));
+                    // 与登录校验保持一致：BCrypt 自带随机盐，salt 字段保留置空以兼容历史结构
+                    user.setSalt("");
+                    user.setPassword(PasswordUtils.encode(password));
                     user.setCreateBy(operName);
                     userMapper.insertUser(user);
                     successNum++;
