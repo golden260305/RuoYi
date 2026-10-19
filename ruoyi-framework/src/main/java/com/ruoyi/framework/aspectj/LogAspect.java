@@ -1,7 +1,10 @@
 package com.ruoyi.framework.aspectj;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.ArrayUtils;
@@ -16,8 +19,10 @@ import org.springframework.core.NamedThreadLocal;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.multipart.MultipartFile;
-import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.support.spring.PropertyPreFilters;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.filter.Filter;
+import com.alibaba.fastjson2.filter.PropertyPreFilter;
+import com.alibaba.fastjson2.filter.ValueFilter;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.core.text.Convert;
@@ -43,6 +48,10 @@ public class LogAspect
 
     /** 排除敏感属性字段 */
     public static final String[] EXCLUDE_PROPERTIES = { "password", "oldPassword", "newPassword", "confirmPassword" };
+
+    /** 需要脱敏展示的个人信息字段 */
+    private static final Set<String> MASK_PROPERTIES = new HashSet<>(Arrays.asList(
+            "phonenumber", "mobile", "phone", "email", "idCard", "identityCard", "bankCard", "cardNo"));
 
     /** 计算操作消耗时间 */
     private static final ThreadLocal<Long> TIME_THREADLOCAL = new NamedThreadLocal<Long>("Cost Time");
@@ -160,7 +169,7 @@ public class LogAspect
         // 是否需要保存response，参数和值
         if (log.isSaveResponseData() && StringUtils.isNotNull(jsonResult))
         {
-            operLog.setJsonResult(StringUtils.substring(JSONObject.toJSONString(jsonResult), 0, 2000));
+            operLog.setJsonResult(StringUtils.substring(JSON.toJSONString(jsonResult), 0, 2000));
         }
     }
 
@@ -175,7 +184,7 @@ public class LogAspect
         Map<String, String[]> map = ServletUtils.getRequest().getParameterMap();
         if (StringUtils.isNotEmpty(map))
         {
-            String params = JSONObject.toJSONString(map, excludePropertyPreFilter(excludeParamNames));
+            String params = JSON.toJSONString(map, buildLogFilters(excludeParamNames));
             operLog.setOperParam(StringUtils.substring(params, 0, PARAM_MAX_LENGTH));
         }
         else
@@ -190,11 +199,55 @@ public class LogAspect
     }
 
     /**
-     * 忽略敏感属性
+     * 构造日志序列化过滤器：密码类字段直接剔除，个人信息类字段脱敏
      */
-    public PropertyPreFilters.MySimplePropertyPreFilter excludePropertyPreFilter(String[] excludeParamNames)
+    public Filter[] buildLogFilters(String[] excludeParamNames)
     {
-        return new PropertyPreFilters().addFilter().addExcludes(ArrayUtils.addAll(EXCLUDE_PROPERTIES, excludeParamNames));
+        Set<String> excludes = new HashSet<>(Arrays.asList(ArrayUtils.addAll(EXCLUDE_PROPERTIES, excludeParamNames)));
+        PropertyPreFilter excludeFilter = (writer, object, name) -> !excludes.contains(name);
+        ValueFilter maskFilter = (object, name, value) -> {
+            if (!MASK_PROPERTIES.contains(name))
+            {
+                return value;
+            }
+            if (value instanceof String)
+            {
+                return mask((String) value);
+            }
+            if (value instanceof String[])
+            {
+                String[] values = (String[]) value;
+                String[] masked = new String[values.length];
+                for (int i = 0; i < values.length; i++)
+                {
+                    masked[i] = mask(values[i]);
+                }
+                return masked;
+            }
+            return value;
+        };
+        return new Filter[] { excludeFilter, maskFilter };
+    }
+
+    /**
+     * 字符串脱敏，保留首尾便于排查
+     */
+    private String mask(String value)
+    {
+        if (StringUtils.isEmpty(value))
+        {
+            return value;
+        }
+        int length = value.length();
+        if (length <= 4)
+        {
+            return "****";
+        }
+        if (length <= 7)
+        {
+            return value.charAt(0) + "****" + value.charAt(length - 1);
+        }
+        return value.substring(0, 3) + "****" + value.substring(length - 2);
     }
 
     /**
@@ -211,7 +264,7 @@ public class LogAspect
                 {
                     try
                     {
-                        Object jsonObj = JSONObject.toJSONString(o, excludePropertyPreFilter(excludeParamNames));
+                        Object jsonObj = JSON.toJSONString(o, buildLogFilters(excludeParamNames));
                         params.append(jsonObj).append(" ");
                         if (params.length() >= PARAM_MAX_LENGTH)
                         {

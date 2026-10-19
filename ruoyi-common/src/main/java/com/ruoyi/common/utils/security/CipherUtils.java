@@ -14,7 +14,7 @@ public class CipherUtils
     /**
      * 生成随机秘钥
      *
-     * @param keyBitSize 字节大小
+     * @param keyBitSize 密钥长度，单位为比特（如 AES 用 128、256）
      * @param algorithmName 算法名称
      * @return 创建密匙
      */

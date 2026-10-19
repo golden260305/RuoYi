@@ -2,7 +2,7 @@ package com.ruoyi.common.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.utils.http.HttpUtils;
@@ -46,7 +46,7 @@ public class AddressUtils
             }
             catch (Exception e)
             {
-                log.error("获取地理位置异常 {}", e);
+                log.error("获取地理位置异常 {}", ip, e);
             }
         }
         return UNKNOWN;
