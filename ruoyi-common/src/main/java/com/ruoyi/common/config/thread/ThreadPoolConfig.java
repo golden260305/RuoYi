@@ -41,6 +41,27 @@ public class ThreadPoolConfig
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         return executor;
     }
+
+    /**
+     * 异步业务日志专用线程池
+     *
+     * 与 scheduledExecutorService 分离：ScheduledThreadPoolExecutor 内部的
+     * DelayedWorkQueue 是无界队列，拒绝策略永远不会触发，高并发下日志任务
+     * 会持续堆积直至 OOM。此处使用有界队列 + CallerRunsPolicy，
+     * 队列满时由调用线程同步执行，形成天然背压。
+     */
+    @Bean(name = "asyncLogExecutor")
+    public ThreadPoolTaskExecutor asyncLogExecutor()
+    {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(50);
+        executor.setQueueCapacity(1000);
+        executor.setKeepAliveSeconds(300);
+        executor.setThreadNamePrefix("async-log-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        return executor;
+    }
     
     /**
      * 执行周期性或定时任务

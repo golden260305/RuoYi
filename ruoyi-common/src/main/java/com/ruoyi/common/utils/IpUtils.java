@@ -2,7 +2,10 @@ package com.ruoyi.common.utils;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.regex.Pattern;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 获取IP方法
@@ -11,12 +14,21 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 public class IpUtils
 {
+    private static final Logger log = LoggerFactory.getLogger(IpUtils.class);
+
     public final static String REGX_0_255 = "(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)";
     // 匹配 ip
     public final static String REGX_IP = "((" + REGX_0_255 + "\\.){3}" + REGX_0_255 + ")";
     public final static String REGX_IP_WILDCARD = "(((\\*\\.){3}\\*)|(" + REGX_0_255 + "(\\.\\*){3})|(" + REGX_0_255 + "\\." + REGX_0_255 + ")(\\.\\*){2}" + "|((" + REGX_0_255 + "\\.){3}\\*))";
     // 匹配网段
     public final static String REGX_IP_SEG = "(" + REGX_IP + "\\-" + REGX_IP + ")";
+
+    /** 预编译正则，避免每次调用重新编译 */
+    private static final Pattern PATTERN_IP = Pattern.compile(REGX_IP);
+
+    private static final Pattern PATTERN_IP_WILDCARD = Pattern.compile(REGX_IP_WILDCARD);
+
+    private static final Pattern PATTERN_IP_SEG = Pattern.compile(REGX_IP_SEG);
 
     /**
      * 获取客户端IP
@@ -64,6 +76,11 @@ public class IpUtils
      */
     public static boolean internalIp(String ip)
     {
+        if (StringUtils.isBlank(ip))
+        {
+            // 无法解析的地址按内网处理，避免触发外部查询
+            return true;
+        }
         byte[] addr = textToNumericFormatV4(ip);
         return internalIp(addr) || "127.0.0.1".equals(ip);
     }
@@ -100,15 +117,20 @@ public class IpUtils
                 {
                     return true;
                 }
+                break;
             case SECTION_5:
                 switch (b1)
                 {
                     case SECTION_6:
                         return true;
+                    default:
+                        break;
                 }
+                break;
             default:
-                return false;
+                break;
         }
+        return false;
     }
 
     /**
@@ -119,7 +141,7 @@ public class IpUtils
      */
     public static byte[] textToNumericFormatV4(String text)
     {
-        if (text.length() == 0)
+        if (StringUtils.isBlank(text))
         {
             return null;
         }
@@ -138,10 +160,10 @@ public class IpUtils
                     {
                         return null;
                     }
-                    bytes[0] = (byte) (int) (l >> 24 & 0xFF);
-                    bytes[1] = (byte) (int) ((l & 0xFFFFFF) >> 16 & 0xFF);
-                    bytes[2] = (byte) (int) ((l & 0xFFFF) >> 8 & 0xFF);
-                    bytes[3] = (byte) (int) (l & 0xFF);
+                    bytes[0] = (byte) (l >> 24 & 0xFF);
+                    bytes[1] = (byte) (l >> 16 & 0xFF);
+                    bytes[2] = (byte) (l >> 8 & 0xFF);
+                    bytes[3] = (byte) (l & 0xFF);
                     break;
                 case 2:
                     l = Integer.parseInt(elements[0]);
@@ -149,15 +171,15 @@ public class IpUtils
                     {
                         return null;
                     }
-                    bytes[0] = (byte) (int) (l & 0xFF);
+                    bytes[0] = (byte) (l & 0xFF);
                     l = Integer.parseInt(elements[1]);
                     if ((l < 0L) || (l > 16777215L))
                     {
                         return null;
                     }
-                    bytes[1] = (byte) (int) (l >> 16 & 0xFF);
-                    bytes[2] = (byte) (int) ((l & 0xFFFF) >> 8 & 0xFF);
-                    bytes[3] = (byte) (int) (l & 0xFF);
+                    bytes[1] = (byte) (l >> 16 & 0xFF);
+                    bytes[2] = (byte) ((l & 0xFFFF) >> 8 & 0xFF);
+                    bytes[3] = (byte) (l & 0xFF);
                     break;
                 case 3:
                     for (i = 0; i < 2; ++i)
@@ -167,15 +189,15 @@ public class IpUtils
                         {
                             return null;
                         }
-                        bytes[i] = (byte) (int) (l & 0xFF);
+                        bytes[i] = (byte) (l & 0xFF);
                     }
                     l = Integer.parseInt(elements[2]);
                     if ((l < 0L) || (l > 65535L))
                     {
                         return null;
                     }
-                    bytes[2] = (byte) (int) (l >> 8 & 0xFF);
-                    bytes[3] = (byte) (int) (l & 0xFF);
+                    bytes[2] = (byte) (l >> 8 & 0xFF);
+                    bytes[3] = (byte) (l & 0xFF);
                     break;
                 case 4:
                     for (i = 0; i < 4; ++i)
@@ -185,7 +207,7 @@ public class IpUtils
                         {
                             return null;
                         }
-                        bytes[i] = (byte) (int) (l & 0xFF);
+                        bytes[i] = (byte) (l & 0xFF);
                     }
                     break;
                 default:
@@ -212,6 +234,7 @@ public class IpUtils
         }
         catch (UnknownHostException e)
         {
+            log.warn("无法获取本机 IP 地址: {}", e.getMessage());
         }
         return "127.0.0.1";
     }
@@ -229,6 +252,7 @@ public class IpUtils
         }
         catch (UnknownHostException e)
         {
+            log.warn("无法获取本机主机名: {}", e.getMessage());
         }
         return "未知";
     }
@@ -249,7 +273,7 @@ public class IpUtils
             {
                 if (false == isUnknown(subIp))
                 {
-                    ip = subIp;
+                    ip = subIp.trim();
                     break;
                 }
             }
@@ -273,7 +297,7 @@ public class IpUtils
      */
     public static boolean isIP(String ip)
     {
-        return StringUtils.isNotBlank(ip) && ip.matches(REGX_IP);
+        return StringUtils.isNotBlank(ip) && PATTERN_IP.matcher(ip).matches();
     }
 
     /**
@@ -281,7 +305,7 @@ public class IpUtils
      */
     public static boolean isIpWildCard(String ip)
     {
-        return StringUtils.isNotBlank(ip) && ip.matches(REGX_IP_WILDCARD);
+        return StringUtils.isNotBlank(ip) && PATTERN_IP_WILDCARD.matcher(ip).matches();
     }
 
     /**
@@ -291,16 +315,18 @@ public class IpUtils
     {
         String[] s1 = ipWildCard.split("\\.");
         String[] s2 = ip.split("\\.");
-        boolean isMatchedSeg = true;
+        if (s1.length != s2.length)
+        {
+            return false;
+        }
         for (int i = 0; i < s1.length && !s1[i].equals("*"); i++)
         {
             if (!s1[i].equals(s2[i]))
             {
-                isMatchedSeg = false;
-                break;
+                return false;
             }
         }
-        return isMatchedSeg;
+        return true;
     }
 
     /**
@@ -308,7 +334,7 @@ public class IpUtils
      */
     public static boolean isIPSegment(String ipSeg)
     {
-        return StringUtils.isNotBlank(ipSeg) && ipSeg.matches(REGX_IP_SEG);
+        return StringUtils.isNotBlank(ipSeg) && PATTERN_IP_SEG.matcher(ipSeg).matches();
     }
 
     /**
@@ -317,15 +343,31 @@ public class IpUtils
     public static boolean ipIsInNetNoCheck(String iparea, String ip)
     {
         int idx = iparea.indexOf('-');
+        if (idx < 0)
+        {
+            return false;
+        }
         String[] sips = iparea.substring(0, idx).split("\\.");
         String[] sipe = iparea.substring(idx + 1).split("\\.");
         String[] sipt = ip.split("\\.");
-        long ips = 0L, ipe = 0L, ipt = 0L;
-        for (int i = 0; i < 4; ++i)
+        if (sips.length != 4 || sipe.length != 4 || sipt.length != 4)
         {
-            ips = ips << 8 | Integer.parseInt(sips[i]);
-            ipe = ipe << 8 | Integer.parseInt(sipe[i]);
-            ipt = ipt << 8 | Integer.parseInt(sipt[i]);
+            return false;
+        }
+        long ips = 0L, ipe = 0L, ipt = 0L;
+        try
+        {
+            for (int i = 0; i < 4; ++i)
+            {
+                ips = ips << 8 | Integer.parseInt(sips[i]);
+                ipe = ipe << 8 | Integer.parseInt(sipe[i]);
+                ipt = ipt << 8 | Integer.parseInt(sipt[i]);
+            }
+        }
+        catch (NumberFormatException e)
+        {
+            log.warn("非法的 IP 网段配置: {}", iparea);
+            return false;
         }
         if (ips > ipe)
         {

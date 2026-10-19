@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.config.ServerConfig;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.utils.ShiroUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.file.FileUploadUtils;
 import com.ruoyi.common.utils.file.FileUtils;
@@ -58,8 +59,13 @@ public class CommonController
             response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
             FileUtils.setAttachmentResponseHeader(response, realFileName);
             FileUtils.writeBytes(filePath, response.getOutputStream());
-            if (delete)
+            if (Boolean.TRUE.equals(delete))
             {
+                // 删除属于高危操作，不能仅凭登录态就放行，否则任意账号可清理他人上传文件
+                if (!ShiroUtils.isAdmin())
+                {
+                    throw new Exception("当前账号无权限删除文件");
+                }
                 FileUtils.deleteFile(filePath);
             }
         }

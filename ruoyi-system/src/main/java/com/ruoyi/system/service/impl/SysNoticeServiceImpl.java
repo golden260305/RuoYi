@@ -4,6 +4,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.ruoyi.common.core.text.Convert;
+import com.ruoyi.common.utils.html.HtmlSanitizer;
 import com.ruoyi.system.domain.SysNotice;
 import com.ruoyi.system.mapper.SysNoticeMapper;
 import com.ruoyi.system.service.ISysNoticeService;
@@ -53,6 +54,8 @@ public class SysNoticeServiceImpl implements ISysNoticeService
     @Override
     public int insertNotice(SysNotice notice)
     {
+        // 富文本入库前做白名单清洗，页面以 th:utext 渲染，必须在源头阻断脚本注入
+        notice.setNoticeContent(HtmlSanitizer.clean(notice.getNoticeContent()));
         return noticeMapper.insertNotice(notice);
     }
 
@@ -65,6 +68,7 @@ public class SysNoticeServiceImpl implements ISysNoticeService
     @Override
     public int updateNotice(SysNotice notice)
     {
+        notice.setNoticeContent(HtmlSanitizer.clean(notice.getNoticeContent()));
         return noticeMapper.updateNotice(notice);
     }
 

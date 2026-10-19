@@ -39,19 +39,24 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
 
         HttpSession session = request.getSession();
         Object sessionObj = session.getAttribute(SESSION_REPEAT_KEY);
-        if (sessionObj != null)
+        // 复用已有记录，否则每次请求都会覆盖整张表，导致只有连续两次同 URL 才能命中
+        Map<String, Object> sessionMap;
+        if (sessionObj instanceof Map)
         {
-            Map<String, Object> sessionMap = (Map<String, Object>) sessionObj;
-            if (sessionMap.containsKey(url))
+            sessionMap = (Map<String, Object>) sessionObj;
+        }
+        else
+        {
+            sessionMap = new HashMap<String, Object>();
+        }
+        if (sessionMap.containsKey(url))
+        {
+            Map<String, Object> preDataMap = (Map<String, Object>) sessionMap.get(url);
+            if (compareParams(nowDataMap, preDataMap) && compareTime(nowDataMap, preDataMap, annotation.interval()))
             {
-                Map<String, Object> preDataMap = (Map<String, Object>) sessionMap.get(url);
-                if (compareParams(nowDataMap, preDataMap) && compareTime(nowDataMap, preDataMap, annotation.interval()))
-                {
-                    return true;
-                }
+                return true;
             }
         }
-        Map<String, Object> sessionMap = new HashMap<String, Object>();
         sessionMap.put(url, nowDataMap);
         session.setAttribute(SESSION_REPEAT_KEY, sessionMap);
         return false;

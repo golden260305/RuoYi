@@ -84,7 +84,13 @@ public class SysIndexController extends BaseController
         }
         String webIndex = "topnav".equalsIgnoreCase(indexStyle) ? "index-topnav" : "index";
         // CSRF Token
-        request.getSession().setAttribute(ShiroConstants.CSRF_TOKEN, ServletUtils.generateToken());
+        // 仅在会话内首次访问时生成：页面渲染时把 token 固化进 meta 标签，
+        // 若每次进入 /index 都重新生成，多标签页会互相覆盖 session 中的 token，
+        // 导致先打开的标签页后续 POST 请求因 token 不匹配被 CSRF 过滤器拒绝。
+        if (request.getSession().getAttribute(ShiroConstants.CSRF_TOKEN) == null)
+        {
+            request.getSession().setAttribute(ShiroConstants.CSRF_TOKEN, ServletUtils.generateToken());
+        }
         return webIndex;
     }
 
